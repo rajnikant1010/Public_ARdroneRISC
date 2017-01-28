@@ -1,0 +1,21 @@
+<package>
+  <description brief="data_extraction">
+
+     data_extraction
+
+  </description>
+  <author>LAW</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/data_extraction</url>
+  <depend package="rosbag"/>
+  <depend package="roscpp"/>
+  <depend package="rospy"/>
+  <depend package="cv_bridge"/>
+  <depend package="ardrone_autonomy"/>
+  <depend package="sensor_msgs"/>
+  <depend package="risc_msgs"/>
+
+</package>
+
+

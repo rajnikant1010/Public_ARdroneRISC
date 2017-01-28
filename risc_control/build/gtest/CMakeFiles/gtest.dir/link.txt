@@ -1,0 +1,1 @@
+/usr/bin/c++  -fPIC -O2 -g -DNDEBUG   -shared -Wl,-soname,libgtest.so -o /home/anusnax230/anusna_ws/src/risc_control/lib/libgtest.so CMakeFiles/gtest.dir/src/gtest-all.cc.o  -L/opt/ros/indigo/lib  -L/home/anusnax230/anusna_ws/src/risc_control/build/gtest/src -lpthread -Wl,-rpath,/opt/ros/indigo/lib:/home/anusnax230/anusna_ws/src/risc_control/build/gtest/src 

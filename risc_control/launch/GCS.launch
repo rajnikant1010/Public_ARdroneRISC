@@ -1,0 +1,11 @@
+<launch>
+
+	<!-- Get Cortex marker data Streaming -->
+  <node pkg="cortex_ros" type="stream_markers" name="stream_markers" output="screen">
+  </node>
+
+	<!-- Get Cortex State estimation given Templates -->
+  <node pkg="risc_estimation" type="states_estimation.py" name="states_estimation" output="screen">
+  </node>
+
+<launch>

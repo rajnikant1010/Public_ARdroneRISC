@@ -1,0 +1,176 @@
+/*======================================================
+	Created by:  	D. Spencer Maughan
+	Last updated: 	October 2014
+	File name: 	stream.cpp
+	Organization:	RISC Lab, Utah State University
+ ======================================================*/
+
+#include "ros/ros.h"
+#include "cortex_ros/cortex.h"
+#include <risc_msgs/Mocap_marker.h>
+#include <risc_msgs/Mocap_markers.h>
+#include <risc_msgs/Mocap_data.h>
+#include <tf/transform_broadcaster.h>
+#include <sstream>
+#include <stdio.h>
+#include <iostream>
+#include <unistd.h>
+#include <string.h>
+#include <math.h>
+#include <numeric>
+#define PI 3.141592653589793
+
+	/*=================
+              Variables
+	  =================*/
+
+int bodies; //number of bodies
+ros::Publisher pub;
+ros::Publisher publ;
+risc_msgs::Mocap_data p;
+float conversion = 0.001;
+
+void MyErrorMsgHandler(int iLevel, const char *szMsg)
+{
+  const char *szLevel = NULL;
+
+  if (iLevel == VL_Debug) {
+    szLevel = "Debug";
+  } else if (iLevel == VL_Info) {
+    szLevel = "Info";
+  } else if (iLevel == VL_Warning) {
+    szLevel = "Warning";
+  } else if (iLevel == VL_Error) {
+    szLevel = "Error";
+  }
+
+  ROS_INFO("    %s: %s\n", szLevel, szMsg);
+}
+
+	/*========================
+             Primary Function
+	  ========================*/
+
+void Datahandler(sFrameOfData* frame)
+{
+bodies = frame->nBodies;
+p.header.seq = frame->iFrame;
+p.header.stamp =  ros::Time::now() - ros::Duration(frame->fDelay);
+p.header.frame_id = "/cortex";
+p.Obj.resize(bodies);
+
+	/*=====================================
+	   Variables For 3 to 8 marker Objects
+	  =====================================*/
+//loop over all bodies and states
+for (int z = 0; z < bodies; z++)
+{
+    int markers = frame->BodyData[z].nMarkers;
+    p.Obj[z].marker.resize(markers);
+    p.Obj[z].name = frame->BodyData[z].szName;
+    p.Obj[z].residual = frame->BodyData[z].fAvgMarkerResidual;
+    for (int i = 0; i<markers; i++)
+{
+         p.Obj[z].marker[i].x = conversion*frame->BodyData[z].Markers[i][0];
+         p.Obj[z].marker[i].y = conversion*frame->BodyData[z].Markers[i][1];
+         p.Obj[z].marker[i].z = conversion*frame->BodyData[z].Markers[i][2];
+}
+}
+pub.publish(p);
+}
+
+
+
+int main(int argc, char **argv)
+{
+  ros::init(argc, argv, "MocapStates");
+  ros::NodeHandle n;
+	/*=====================
+           Initialize Cortex
+	  =====================*/
+	
+  int retval = RC_Okay;
+  unsigned char SDK_Version[4];
+  sBodyDefs* pBodyDefs = NULL;
+  
+  
+Cortex_SetVerbosityLevel(VL_Info);
+Cortex_SetErrorMsgHandlerFunc(MyErrorMsgHandler);
+Cortex_GetSdkVersion(SDK_Version);
+   ROS_INFO("Using SDK Version %d.%d.%d\n", SDK_Version[1], SDK_Version[2],
+         SDK_Version[3]);
+  
+
+ROS_INFO("****** Cortex_Initialize ******\n");
+  if (argc == 1) {
+    retval = Cortex_Initialize("", NULL);
+  } else if (argc == 2) {
+    retval = Cortex_Initialize(argv[1], NULL);
+  } else if (argc == 3) {
+    retval = Cortex_Initialize(argv[1], argv[2]);
+  }
+
+if (retval != RC_Okay) {
+     ROS_INFO("Error: Unable to initialize ethernet communication\n");
+    retval = Cortex_Exit();
+    return 1;
+  }
+
+ROS_INFO("****** Cortex_GetBodyDefs ******\n");
+  pBodyDefs = Cortex_GetBodyDefs();
+
+  if (pBodyDefs == NULL) {
+    ROS_INFO("Failed to get body defs\n");
+  } else {
+    ROS_INFO("Got body defs\n");
+    Cortex_FreeBodyDefs(pBodyDefs);
+    pBodyDefs = NULL;
+  }
+
+void *pResponse;
+  int nBytes;
+  retval = Cortex_Request("GetContextFrameRate", &pResponse, &nBytes);
+  if (retval != RC_Okay)
+    ROS_INFO("ERROR, GetContextFrameRate\n");
+
+float *contextFrameRate = (float*) pResponse;
+
+ROS_INFO("ContextFrameRate = %3.1f Hz\n", *contextFrameRate);
+
+float Rate = *contextFrameRate;
+
+ROS_INFO("*** Starting live mode ***\n");
+  retval = Cortex_Request("LiveMode", &pResponse, &nBytes);
+
+	/*=====================
+            Set up Publisher
+	  =====================*/
+
+pub = n.advertise<risc_msgs::Mocap_data>("/mocap_data", 1000);
+
+	/*=====================
+            Data Request Loop
+	  =====================*/
+
+ros::Rate loop_rate(Rate);
+while (ros::ok())
+{
+sFrameOfData* frame = Cortex_GetCurrentFrame(); //Request Current Frame
+Datahandler(frame); // Pull and Calculate Data you are interested in.
+loop_rate.sleep();
+}
+
+	/*=================
+            Close Cortex
+	  =================*/
+
+retval = Cortex_Request("Pause", &pResponse, &nBytes);
+ROS_INFO("*** Paused live mode ***\n");
+
+ROS_INFO("****** Cortex_Exit ******\n");
+  retval = Cortex_Exit();
+
+
+  return 0;
+}
+
